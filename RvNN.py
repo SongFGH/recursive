@@ -28,7 +28,7 @@ class RvNN:
     	TypeError: If "cell" is not an instance of RNNCell.
     	ValueError: If inputs is None or an empty list.
     '''
-	def __init__(cell, rootNodes, inputs, initial_state=None, dtype=None, scope=None):
+	def __init__(cell, rootNodes, inputs, dtype=None, scope=None):
 		if not isinstance(cell, RecursiveCell):
 			raise TypeError("cell must be an instance of RecursiveCell")
 		if not isinstance(inputs, TreeNode):
@@ -36,18 +36,23 @@ class RvNN:
 		if not inputs:
 			raise ValueError("inputs must not be empty")
 
-		self.output = []
-		self.states = []
+		self.outputs = []
 		with variable_scope(scope or "RvNN"):
-			batch_size = tf.shape(inputs[0])[0]
-			if initial_state is not None:
-				state = initial_state
+			batch_size = tf.shape(inputs)
 			else
-				if not dtype:
-					raise ValueError("If no initial_state is provided, dtype must be.")
-				state = cell.zero_state(batch_size, dtype)
+				for root in rootNodes:
+					outputs = self.__recursive(cell, root, inputs)
 
-			if sequence_length:
-				zero_output_state = (
-					tf.zeros(tf.pack([batch_size, cell.output_size]), inputs[0].dtype),
-					tf.zeros(tf.pack([batch_size, cell.state_size])))
+	def __recursive(self, cell, root, inputs):
+		if root.isLeaf():
+			input_ = inputs[root.frontleaf]
+			output, states = cell(input_, None, tf.variable_scope("leaf"));
+			self.outputs.append(output)
+			return output
+		else
+			left_output = self.__recursive(cell, root.leftChild, inputs)
+			right_output = self.__recursive(cell, root.rightChild, inputs)
+			child_states = [left_output, right_output]
+			output, states = cell(None, states, tf.variable_scope("composor"));
+			self.outputs.append(output)
+			return output

@@ -91,12 +91,61 @@ class BasicRecursiveCell(RecursiveCell):
     	with tf.variable_scope(scope or type(self).__name__):  # "BasicRecursiveCell"
     		with tf.variable_scope("leaf"):
       			output = tf.tanh(linear.linear(inputs, self._num_units, True))
-    			return output, output
+    			return output, None
     # for a composor cell
     elif inputs is None and states is not None:
     	with tf.variable_scope(scope or type(self).__name__):  # "BasicRecursiveCell"
       		with tf.variable_scope("composor"):
       			output = tf.tanh(linear.linear([states[0], states[1]], self._num_units, True))
-    			return output, output
+    			return output, None
     else
     	raise NotImplementedError("Invalid type of node")
+
+
+
+class MultiRecursiveCell(RecursiveCell):
+  """RNN cell composed sequentially of multiple simple cells."""
+
+  def __init__(self, cells):
+    """Create a RNN cell composed sequentially of a number of RNNCells.
+
+    Args:
+      cells: list of RNNCells that will be composed in this order.
+
+    Raises:
+      ValueError: if cells is empty (not allowed) or if their sizes don't match.
+    """
+    if not cells:
+      raise ValueError("Must specify at least one cell for MultiRNNCell.")
+    for i in xrange(len(cells) - 1):
+      if cells[i + 1].input_size != cells[i].output_size:
+        raise ValueError("In MultiRNNCell, the input size of each next"
+                         " cell must match the output size of the previous one."
+                         " Mismatched output size in cell %d." % i)
+    self._cells = cells
+
+  @property
+  def input_size(self):
+    return self._cells[0].input_size
+
+  @property
+  def output_size(self):
+    return self._cells[-1].output_size
+
+  @property
+  def state_size(self):
+    return sum([cell.state_size for cell in self._cells])
+
+  def __call__(self, inputs, state, scope=None):
+    """Run this multi-layer cell on inputs, starting from state."""
+    with tf.variable_scope(scope or type(self).__name__):  # "MultiRNNCell"
+      cur_state_pos = 0
+      cur_inp = inputs
+      new_states = []
+      for i, cell in enumerate(self._cells):
+        with tf.variable_scope("Cell%d" % i):
+          cur_state = tf.slice(state, [0, cur_state_pos], [-1, cell.state_size])
+          cur_state_pos += cell.state_size
+          cur_inp, new_state = cell(cur_inp, cur_state)
+          new_states.append(new_state)
+    return cur_inp, tf.concat(1, new_states)
