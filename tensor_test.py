@@ -1,15 +1,7 @@
 import tensorflow as tf
+import numpy as np
 
-'''
-constant system parameters
-'''
-inputDim = 300
-hiddenDim = 150
-outputDim = 5
 
-'''
-shared model parameters
-'''
-output_scope = tf.variable_scope("output")
-composor_scope = tf.variable_scope("composor")
-leaf_scope = tf.variable_scope("leaf")
+input_data = tf.placeholder(tf.int32, [20, 10])
+embedding = tf.get_variable("embedding", [10000, 100])
+inputs = tf.split(1, 10, tf.nn.embedding_lookup(embedding, input_data))
